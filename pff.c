@@ -42,7 +42,7 @@ int main(int argc, char** argv){
             grid[i][j].g = 100;
             grid[i][j].b = 100;
 
-            grid[i][j].neighbor[0] = &grid[(i-1)&GRIDSIZE-1][j];
+            grid[i][j].neighbor[0] = &grid[(i-1)%GRIDSIZE][j];
             grid[i][j].neighbor[1] = &grid[(i+1)%GRIDSIZE][j];
             grid[i][j].neighbor[2] = &grid[i][(j-1)%GRIDSIZE];
             grid[i][j].neighbor[3] = &grid[i][(j+1)%GRIDSIZE];
@@ -131,7 +131,7 @@ void average(struct pop* pos){
         }
         pos = pos->neighbor[1];
     }
-
+    free(temp);
 }
 void displayScreen(struct pop s[GRIDSIZE][GRIDSIZE], struct WindowContext wc){
     GC gc = XDefaultGC(wc.display, 0);
