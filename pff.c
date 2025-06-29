@@ -8,9 +8,9 @@
 #include <poll.h>
 #include <X11/Xlib.h>
 
-#define RANDOMNESS 3
-#define GRIDSIZE 128 
-
+#define RANDOMNESS 9
+#define GRIDSIZE 512 
+#define PIXELSIZE 2
 
 struct pop {
     float r;
@@ -33,7 +33,9 @@ void displayScreen(struct pop s[GRIDSIZE][GRIDSIZE], struct WindowContext wc);
 float V3dotProduct(float x[3], float y[3]);
 void V3normalize(float x[3], float y[3]);
 int main(int argc, char** argv){
-    struct pop grid[GRIDSIZE][GRIDSIZE] = {0};
+    struct pop (*grid)[GRIDSIZE] = malloc(sizeof(struct pop)*GRIDSIZE*GRIDSIZE);
+    printf("%ld\n", (uint64_t)grid);
+    printf("%ld\n", (uint64_t)*grid);
     for(unsigned int i = 0; i < GRIDSIZE; i++){
         for( unsigned int j = 0; j < GRIDSIZE; j++){
             grid[i][j].r = 100;
@@ -60,7 +62,7 @@ int main(int argc, char** argv){
     XEvent event;
     for(;;){
         //XNextEvent(wc.display, &event);
-        if((count&15) == 0){
+        if((count&63) == 0){
            displayScreen(grid, wc);
         }
 
@@ -80,7 +82,7 @@ int main(int argc, char** argv){
 struct WindowContext createWindow(){
     struct WindowContext wc = {0};
     Display* display = XOpenDisplay(NULL);
-    Window w = XCreateSimpleWindow(display, DefaultRootWindow(display), 100, 100, GRIDSIZE*8, GRIDSIZE*8, 1, BlackPixel(display, 0), WhitePixel(display, 0));
+    Window w = XCreateSimpleWindow(display, DefaultRootWindow(display), 100, 100, GRIDSIZE*PIXELSIZE, GRIDSIZE*PIXELSIZE, 1, BlackPixel(display, 0), WhitePixel(display, 0));
     XMapWindow(display, w);
     XSelectInput(display, w, ExposureMask); 
     wc.display = display;
@@ -99,7 +101,7 @@ void randomize(struct pop* pos){
     }
 }
 void average(struct pop* pos){
-    struct pop temp[GRIDSIZE][GRIDSIZE] = {0};
+    struct pop (*temp)[GRIDSIZE] = malloc(sizeof(struct pop)* GRIDSIZE * GRIDSIZE);
     for(int i = 0; i < GRIDSIZE; i++){
         for(int j = 0; j < GRIDSIZE; j++){
             int l = rand()&3;
@@ -133,13 +135,13 @@ void average(struct pop* pos){
 }
 void displayScreen(struct pop s[GRIDSIZE][GRIDSIZE], struct WindowContext wc){
     GC gc = XDefaultGC(wc.display, 0);
-   for(int y = 0; y < GRIDSIZE * 8; y++){
-        for(int x = 0; x < GRIDSIZE * 8; x++){
-            uint8_t r = floor(s[x >> 3][y >> 3].r);
-            uint8_t g = floor(s[x >> 3][y >> 3].g);
-            uint8_t b = floor(s[x >> 3][y >> 3].b);
+   for(int y = 0; y < GRIDSIZE * PIXELSIZE; y++){
+        for(int x = 0; x < GRIDSIZE * PIXELSIZE; x++){
+            uint8_t r = floor(s[x >> 1][y >> 1].r);
+            uint8_t g = floor(s[x >> 1][y >> 1].g);
+            uint8_t b = floor(s[x >> 1][y >> 1].b);
             uint64_t color = (r << 16) | (g << 8) | b;
-            XSetForeground(wc.display, gc, color);
+            //XSetForeground(wc.display, gc, color);
             XDrawPoint(wc.display, wc.window, gc, x, y);
            // XDrawRectangle(wc.display, wc.window,gc, x*8, y*8, 8, 8);
         }
