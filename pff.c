@@ -6,7 +6,7 @@
 #include <math.h>
 #include <time.h>
 #include <poll.h>
-#include "../src/raylib.h"
+#include "raylib-5.5/src/raylib.h"
 
 #define RANDOMNESS 9
 #define GRIDSIZE 512 
