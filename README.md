@@ -1,2 +1,4 @@
 # PrettyColors
-Prettycolor :)
+Makes PrettyColors :)
+# Install
+Run ./make.sh to install.
