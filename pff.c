@@ -6,12 +6,12 @@
 #include <math.h>
 #include <time.h>
 #include <poll.h>
-#include <X11/Xlib.h>
+#include "../src/raylib.h"
 
 #define RANDOMNESS 9
 #define GRIDSIZE 512 
-#define PIXELSIZE 2
-
+#define PIXELSIZE 4
+#define PIXELBITS simpleLog2(PIXELSIZE)
 struct pop {
     float r;
     float g;
@@ -19,75 +19,58 @@ struct pop {
     struct pop* neighbor[4];
     float strength[4];
 };
-struct WindowContext {
-    Display* display;
-    Window window;
-};
-struct WindowContext createWindow();
+Image createWindow();
+uint8_t simpleLog2(int );
 void randomize(struct pop* pos);
 float randRange(float start, float end);
 void navigate(struct pop* current);
 void average(struct pop* pos);
-void displayConsole(struct pop s[GRIDSIZE][GRIDSIZE]);
-void displayScreen(struct pop s[GRIDSIZE][GRIDSIZE], struct WindowContext wc);
+void displayConsole(struct pop(*)[GRIDSIZE]);
+void displayScreen(struct pop(*)[GRIDSIZE] , Image);
 float V3dotProduct(float x[3], float y[3]);
 void V3normalize(float x[3], float y[3]);
 int main(int argc, char** argv){
     struct pop (*grid)[GRIDSIZE] = malloc(sizeof(struct pop)*GRIDSIZE*GRIDSIZE);
-    printf("%ld\n", (uint64_t)grid);
-    printf("%ld\n", (uint64_t)*grid);
+    uint8_t pixelWidth = simpleLog2(PIXELSIZE);
+    printf("%d\n", pixelWidth);
+    getchar();
     for(unsigned int i = 0; i < GRIDSIZE; i++){
         for( unsigned int j = 0; j < GRIDSIZE; j++){
             grid[i][j].r = 100;
             grid[i][j].g = 100;
             grid[i][j].b = 100;
 
-            grid[i][j].neighbor[0] = &grid[(i-1)%GRIDSIZE][j];
+            grid[i][j].neighbor[0] = &grid[(i-1)&(GRIDSIZE-1)][j];
             grid[i][j].neighbor[1] = &grid[(i+1)%GRIDSIZE][j];
             grid[i][j].neighbor[2] = &grid[i][(j-1)%GRIDSIZE];
             grid[i][j].neighbor[3] = &grid[i][(j+1)%GRIDSIZE];
 
-            if(i == GRIDSIZE/2 || i == GRIDSIZE/2 - 1 || i == 0 || i == GRIDSIZE - 1 || j == 0 || j == GRIDSIZE - 1 || j == GRIDSIZE/2 || j == GRIDSIZE/2 -1 ){
+            if(i == GRIDSIZE/2 || i == GRIDSIZE/2 - 1 || i == 0 || i == GRIDSIZE - 1 
+            || j == GRIDSIZE/2 || j == GRIDSIZE/2 - 1 || j == 0 || j == GRIDSIZE - 1){ 
                 grid[i][j].strength[0] = 0.04;
             }else{
                 grid[i][j].strength[0] = 0.8;
             }
         }
     }
-    char buffer[3];
     int count = 0;
-    struct pollfd pollfd = {0 , POLLIN, 0};
-    int pollio;
-    struct WindowContext wc = createWindow();
-    XEvent event;
-    for(;;){
-        //XNextEvent(wc.display, &event);
-        if((count&63) == 0){
-           displayScreen(grid, wc);
-        }
-
+    Image img = createWindow();
+    while(!WindowShouldClose()){
+        displayScreen(grid, img);
         printf("Count: %d\n", count++);
         randomize(&grid[0][0]);
         average(&grid[0][0]);
-        /*if(poll(&pollfd, (nfds_t)1, 1)){ 
-            read(0,&buffer , sizeof(buffer));
-            if(buffer[0] == 'q')
-                break;
-        }*/
     }
+    CloseWindow();
     navigate(&grid[0][0]);  
     return 0;
 
 }
-struct WindowContext createWindow(){
-    struct WindowContext wc = {0};
-    Display* display = XOpenDisplay(NULL);
-    Window w = XCreateSimpleWindow(display, DefaultRootWindow(display), 100, 100, GRIDSIZE*PIXELSIZE, GRIDSIZE*PIXELSIZE, 1, BlackPixel(display, 0), WhitePixel(display, 0));
-    XMapWindow(display, w);
-    XSelectInput(display, w, ExposureMask); 
-    wc.display = display;
-    wc.window = w;
-    return wc;
+Image createWindow(){
+    InitWindow(GRIDSIZE*PIXELSIZE, GRIDSIZE*PIXELSIZE, "PrettyColors");
+     static Image image = {};
+     image = LoadImageFromScreen();
+    return image;
 }
 void randomize(struct pop* pos){
     for(int i = 0; i < GRIDSIZE; i++){
@@ -115,9 +98,18 @@ void average(struct pop* pos){
             float dot1= V3dotProduct(first, me);
             float dot2= V3dotProduct(second, me);
 
-            temp[i][j].r = (pos->r + pos->neighbor[l]->r*pos->neighbor[l]->strength[0]*dot1 + pos->neighbor[t]->r*pos->neighbor[t]->strength[0]*dot2) /(1+pos->neighbor[l]->strength[0]*dot1+pos->neighbor[t]->strength[0]*dot2);
-            temp[i][j].g = (pos->g + pos->neighbor[l]->g*pos->neighbor[l]->strength[0]*dot1 + pos->neighbor[t]->g*pos->neighbor[t]->strength[0]*dot2) /(1+pos->neighbor[l]->strength[0]*dot1+pos->neighbor[t]->strength[0]*dot2);
-            temp[i][j].b = (pos->b + pos->neighbor[l]->b*pos->neighbor[l]->strength[0]*dot1 + pos->neighbor[t]->b*pos->neighbor[t]->strength[0]*dot2) /(1+pos->neighbor[l]->strength[0]*dot1+pos->neighbor[t]->strength[0]*dot2);
+            temp[i][j].r = (pos->r + pos->neighbor[l]->r*pos->neighbor[l]->strength[0]*dot1
+                           + pos->neighbor[t]->r*pos->neighbor[t]->strength[0]*dot2)
+                           / (1+pos->neighbor[l]->strength[0]*dot1+pos->neighbor[t]->strength[0]*dot2);
+
+            temp[i][j].g = (pos->g + pos->neighbor[l]->g*pos->neighbor[l]->strength[0]*dot1
+                           + pos->neighbor[t]->g*pos->neighbor[t]->strength[0]*dot2) 
+                           / (1+pos->neighbor[l]->strength[0]*dot1+pos->neighbor[t]->strength[0]*dot2);
+
+            temp[i][j].b = (pos->b + pos->neighbor[l]->b*pos->neighbor[l]->strength[0]*dot1 
+                           + pos->neighbor[t]->b*pos->neighbor[t]->strength[0]*dot2) 
+                           / (1+pos->neighbor[l]->strength[0]*dot1+pos->neighbor[t]->strength[0]*dot2);
+
             pos = pos->neighbor[3];
         }
         pos = pos->neighbor[1];
@@ -133,29 +125,35 @@ void average(struct pop* pos){
     }
     free(temp);
 }
-void displayScreen(struct pop s[GRIDSIZE][GRIDSIZE], struct WindowContext wc){
-    GC gc = XDefaultGC(wc.display, 0);
+void displayScreen(struct pop (*s)[GRIDSIZE], Image img){
+   Color color = {0,0,0,255};
+   Color tint = {255,255,255,255}; 
    for(int y = 0; y < GRIDSIZE * PIXELSIZE; y++){
         for(int x = 0; x < GRIDSIZE * PIXELSIZE; x++){
-            uint8_t r = floor(s[x >> 1][y >> 1].r);
-            uint8_t g = floor(s[x >> 1][y >> 1].g);
-            uint8_t b = floor(s[x >> 1][y >> 1].b);
-            uint64_t color = (r << 16) | (g << 8) | b;
-            //XSetForeground(wc.display, gc, color);
-            XDrawPoint(wc.display, wc.window, gc, x, y);
-           // XDrawRectangle(wc.display, wc.window,gc, x*8, y*8, 8, 8);
+            color.r = floor(s[x >> PIXELBITS][y >> PIXELBITS].r);
+            color.g = floor(s[x >> PIXELBITS][y >> PIXELBITS].g);
+            color.b = floor(s[x >> PIXELBITS][y >> PIXELBITS].b);
+            ImageDrawPixel(&img,x, y, color);
         }
    }
-
+   Texture2D texture = LoadTextureFromImage(img);
+   BeginDrawing();
+   DrawTexture(texture, 0, 0, tint);
+   EndDrawing();
+   UnloadTexture(texture);
 }
-void displayConsole(struct pop s[GRIDSIZE][GRIDSIZE]){
+void displayConsole(struct pop (*grid)[GRIDSIZE]){
     printf("\n");
     for(unsigned int i = 0; i < GRIDSIZE; i++){
         printf("%2d: ", i); 
         for( unsigned int j = 0; j < GRIDSIZE; j++){
-            printf("\033[38;2;%d;%d;%dm",(uint8_t)floor(s[i][j].r),(uint8_t)floor(s[i][j].g),(uint8_t)floor(s[i][j].b));
+            printf("\033[38;2;%d;%d;%dm",
+                    (uint8_t)floor(grid[i][j].r)
+                    ,(uint8_t)floor(grid[i][j].g)
+                    ,(uint8_t)floor(grid[i][j].b)
+                    );
             printf("|||");
-            //printf("%3.0f:%3.0f:%3.0f ", s[i][j].r, s[i][j].g, s[i][j].b);
+            //printf("%3.0f:%3.0f:%3.0f ", grid[i][j].r, grid[i][j].g, grid[i][j].b);
         }
         printf("\033[39m\n");
     }
@@ -198,4 +196,11 @@ void V3normalize(float x[3], float y[3]){
 }
 float randRange(float start, float end){
     return (float)rand()/(float)RAND_MAX*(end-start) + start;
+}
+uint8_t simpleLog2(int value){
+    uint8_t i = 0;
+    for (; value; value = value>>1){
+       i++; 
+    }
+    return i -1;
 }
